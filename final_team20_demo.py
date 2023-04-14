@@ -135,7 +135,8 @@ class App(ttk.Frame):
         
         nIndex = 0
         for line in lines:
-            line = line[:line.find('#')]
+            if('#' in line):
+                line = line[:line.find('#')]
             if('' != line):
                 listTemp = line.split(',')
                 if(0 == nIndex): #host
@@ -478,7 +479,7 @@ class App(ttk.Frame):
                 strTemp = bytes.decode(line)
                 print(strTemp)
                 self.textdisp.config(state='normal')
-                if('Warning: ' not in strTemp):
+                if(('Warning: ' not in strTemp) and ('Error' not in strTemp)):
                     strID = ""
                     if('"ID": ' in strTemp):
                         strID = strTemp[strTemp.find('"ID": ') + len('"ID": '):strTemp.find(', "temperature"')]
