@@ -300,7 +300,7 @@ class App(ttk.Frame):
 
         # Entry
         self.entry_ca_pub = ttk.Entry(self.input_frame_pub, textvariable=self.str_var_entry_ca_pub)
-        self.entry_ca_pub.insert(0, self.ca_list[1])
+        self.entry_ca_pub.insert(0, self.ca_list[0])
         # self.entry_ca.grid(row=3, column=1, padx=5, pady=(0, 10), sticky="ew", columnspan=2)
         self.entry_ca_pub.grid(row=3, column=0, padx=5, pady=(0, 10), sticky="ew")
         # Button
@@ -310,7 +310,7 @@ class App(ttk.Frame):
 
         # Entry
         self.entry_key_pub = ttk.Entry(self.input_frame_pub, textvariable=self.str_var_entry_key_pub)
-        self.entry_key_pub.insert(0, self.key_list[1])
+        self.entry_key_pub.insert(0, self.key_list[0])
         self.entry_key_pub.grid(row=4, column=0, padx=5, pady=(0, 10), sticky="ew")
         # Button
         self.button_key_pub = ttk.Button(self.input_frame_pub, text="...",  width = 1, command=self.get_path_key_pub)
@@ -318,7 +318,7 @@ class App(ttk.Frame):
 
         # Entry
         self.entry_cert_pub = ttk.Entry(self.input_frame_pub, textvariable=self.str_var_entry_cert_pub)
-        self.entry_cert_pub.insert(0, self.cert_list[1])
+        self.entry_cert_pub.insert(0, self.cert_list[0])
         self.entry_cert_pub.grid(row=5, column=0, padx=5, pady=(0, 10), sticky="ew")
         # Button
         self.button_cert_pub = ttk.Button(self.input_frame_pub, text="...",  width = 1, command=self.get_path_cert_pub)
