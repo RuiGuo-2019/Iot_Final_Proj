@@ -378,6 +378,27 @@ class App(ttk.Frame):
         self.paned = ttk.PanedWindow(self)
         self.paned.grid(row=0, column=2, pady=(25, 5), sticky="nsew", rowspan=3)
 
+        # Notebook, pane #2
+        self.pane_2 = ttk.Frame(self.paned, padding=5)
+        self.paned.add(self.pane_2, weight=3)
+
+        self.notebook = ttk.Notebook(self.pane_2)
+        self.notebook.pack(fill="both", expand=True)
+
+        self.fig = plt.Figure(figsize=(6.4, 3.8))
+        self.x = []
+        self.currentx = 0
+
+        for i in range(self.line_length):
+            self.x.append(i)
+        self.ax = self.fig.add_subplot(111)
+        self.ax.axes.xaxis.set_visible(False)
+
+
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.notebook)
+        self.canvas.get_tk_widget().grid(column=0,row=1)
+        
+
         # Pane #1
         self.pane_1 = ttk.Frame(self.paned, padding=5)
         self.paned.add(self.pane_1, weight=1)
@@ -392,41 +413,15 @@ class App(ttk.Frame):
         self.textdisp.pack(expand=True, fill="both")
 
 
-        # Notebook, pane #2
-        self.pane_2 = ttk.Frame(self.paned, padding=5)
-        self.paned.add(self.pane_2, weight=3)
-
-        # Notebook, pane #2
-        self.notebook = ttk.Notebook(self.pane_2)
-        self.notebook.pack(fill="both", expand=True)
-
-        # # Tab #1
-        # self.tab_1 = ttk.Frame(self.notebook)
-        # for index in [0, 1]:
-        #     self.tab_1.columnconfigure(index=index, weight=1)
-        #     self.tab_1.rowconfigure(index=index, weight=1)
-        # self.notebook.add(self.tab_1, text="Tab 1")
-
-        self.fig = plt.Figure(figsize=(6.4, 3.8))
-        self.x = []
-        self.currentx = 0
-
-        # self.line_length = 100
-        # self.x = np.arange(0, self.line_length)        # x-array
-        for i in range(self.line_length):
-            self.x.append(i)
-        self.ax = self.fig.add_subplot(111)
-        self.ax.axes.xaxis.set_visible(False)
+        
 
 
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self.notebook)
-        self.canvas.get_tk_widget().grid(column=0,row=1)
 
         # Sizegrip
         self.sizegrip = ttk.Sizegrip(self)
         self.sizegrip.grid(row=100, column=100, padx=(0, 5), pady=(0, 5))
 
-        # self.ani = animation.FuncAnimation(self.fig, self.animate, np.arange(1, 200), interval=25, blit=False)
+
 
 
     def get_path_ca(self):
