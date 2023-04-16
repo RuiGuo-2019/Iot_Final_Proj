@@ -6,75 +6,83 @@ from tkinter.filedialog import askopenfilename
 import os
 import sys
 import subprocess
-
+import inspect
+import ctypes
 import sv_ttk #sun valley theme
 
+
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+
+
+global ani
 bClickStop = False
-class class_read:
-
-    def __init__(self, p_connect, textctrl):
-        textctrl.tag_config("tag_1", foreground="red", font=('blod'))
-        result = []
-        while p_connect.poll() is None:
-            line = p_connect.stdout.readline().strip()
-            if line:
-                result.append(line)
-                strTemp = bytes.decode(line)
-                print(strTemp)
-                fTemp = float(strTemp[strTemp.find('"temperature": ') + len('"temperature": '):strTemp.find(', "humidity"')])
-                if(fTemp < 76.85):
-                    textctrl.insert('end', strTemp+'\n')
-                else:
-                    textctrl.insert('end', strTemp+'\n', "tag_1")
-                textctrl.update()
-                textctrl.see('end')
-                if(True == bClickStop):
-                    break
-            sys.stdout.flush()
-            sys.stderr.flush()
-        print("Stop!")
+# class class_read:
+#     def __init__(self, p_connect, textctrl):
+#         textctrl.tag_config("tag_1", foreground="red", font=('blod'))
+#         result = []
+#         while p_connect.poll() is None:
+#             line = p_connect.stdout.readline().strip()
+#             if line:
+#                 result.append(line)
+#                 strTemp = bytes.decode(line)
+#                 print(strTemp)
+#                 fTemp = float(strTemp[strTemp.find('"temperature": ') + len('"temperature": '):strTemp.find(', "humidity"')])
+#                 if(fTemp < 76.85):
+#                     textctrl.insert('end', strTemp+'\n')
+#                 else:
+#                     textctrl.insert('end', strTemp+'\n', "tag_1")
+#                 textctrl.update()
+#                 textctrl.see('end')
+#                 if(True == bClickStop):
+#                     break
+#             sys.stdout.flush()
+#             sys.stderr.flush()
+#         print("Stop!")
         
-        p_connect.kill()
+#         p_connect.kill()
 
-class Thread_process:
-    def __init__(self):
-        self.bClickStop = False
+# class Thread_process:
+#     def __init__(self):
+#         self.bClickStop = False
 
-    def create_connect_thread(self, strCmdPopen):
-        self.connect_thread = threading.Thread(target=self._connect_and_get_message(strCmdPopen), name="T1")
+#     def create_connect_thread(self, strCmdPopen):
+#         self.connect_thread = threading.Thread(target=self._connect_and_get_message(strCmdPopen), name="T1")
 
-    def _connect_and_get_message(self, cmd):
+#     def _connect_and_get_message(self, cmd):
 
-        p = subprocess.Popen(cmd, close_fds=True, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        result = []
-        while p.poll() is None:
-            line = p.stdout.readline().strip()
-            if line:
-                # line = _decode_data(line)
-                result.append(line)
-                # print('\033[1;35m{0}\033[0m'.format(line))
-                print(line)
-                if(True == self.bClickStop):
-                    break
-            sys.stdout.flush()
-            sys.stderr.flush()
-        if p.returncode == 0:
-            print('\033[1;32m************** SUCCESS **************\033[0m')
-        else:
-            print('\033[1;31m************** FAILED **************\033[0m')
+#         p = subprocess.Popen(cmd, close_fds=True, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+#         result = []
+#         while p.poll() is None:
+#             line = p.stdout.readline().strip()
+#             if line:
+#                 # line = _decode_data(line)
+#                 result.append(line)
+#                 # print('\033[1;35m{0}\033[0m'.format(line))
+#                 print(line)
+#                 if(True == self.bClickStop):
+#                     break
+#             sys.stdout.flush()
+#             sys.stderr.flush()
+#         if p.returncode == 0:
+#             print('\033[1;32m************** SUCCESS **************\033[0m')
+#         else:
+#             print('\033[1;31m************** FAILED **************\033[0m')
 
-        self.p_connect.kill()
-        os.killpg(os.getpgid(self.p_connect), 9)
-
-
+#         self.p_connect.kill()
+#         os.killpg(os.getpgid(self.p_connect), 9)
 
 
-        # os.system(cmd)
-        self.bConnect = False
+
+
+#         # os.system(cmd)
+#         self.bConnect = False
 
 class App(ttk.Frame):
-    def __init__(self, parent, c_Thread_process):
-        # self.c_Thread_process = c_Thread_process
+    def __init__(self, parent):
+        self.parent = parent
         self.mosquitto_sub_path = r"D:/Program Files/mosquitto/mosquitto_sub.exe"
         self.mosquitto_pub_path = r"D:/Program Files/mosquitto/mosquitto_pub.exe"
 
@@ -125,9 +133,25 @@ class App(ttk.Frame):
 
         self.bClickStop = False
         self.bConnect = False
+        self.read_thread = None
+
+        self.dict_realtime_line = {}
+        self.list_threshold_line = [[],[]]
+        self.line_length = 20
 
         # Create widgets :)
         self.setup_widgets()
+        
+    
+    def close_window(self):
+        if(self.read_thread is not None):
+            self.stop_thread(self.read_thread)
+        self.read_thread = None
+        self.parent.quit()
+        self.parent.destroy()
+
+
+    
 
     def read_config(self, conf_file):
         with open(conf_file, 'r') as cf:
@@ -367,9 +391,43 @@ class App(ttk.Frame):
         self.textdisp.config(yscrollcommand=self.scrollbar.set)
         self.textdisp.pack(expand=True, fill="both")
 
+
+        # Notebook, pane #2
+        self.pane_2 = ttk.Frame(self.paned, padding=5)
+        self.paned.add(self.pane_2, weight=3)
+
+        # Notebook, pane #2
+        self.notebook = ttk.Notebook(self.pane_2)
+        self.notebook.pack(fill="both", expand=True)
+
+        # # Tab #1
+        # self.tab_1 = ttk.Frame(self.notebook)
+        # for index in [0, 1]:
+        #     self.tab_1.columnconfigure(index=index, weight=1)
+        #     self.tab_1.rowconfigure(index=index, weight=1)
+        # self.notebook.add(self.tab_1, text="Tab 1")
+
+        self.fig = plt.Figure(figsize=(6.4, 3.8))
+        self.x = []
+        self.currentx = 0
+
+        # self.line_length = 100
+        # self.x = np.arange(0, self.line_length)        # x-array
+        for i in range(self.line_length):
+            self.x.append(i)
+        self.ax = self.fig.add_subplot(111)
+        self.ax.axes.xaxis.set_visible(False)
+
+
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.notebook)
+        self.canvas.get_tk_widget().grid(column=0,row=1)
+
         # Sizegrip
         self.sizegrip = ttk.Sizegrip(self)
         self.sizegrip.grid(row=100, column=100, padx=(0, 5), pady=(0, 5))
+
+        # self.ani = animation.FuncAnimation(self.fig, self.animate, np.arange(1, 200), interval=25, blit=False)
+
 
     def get_path_ca(self):
         str_file_path = askopenfilename(title='Open')
@@ -412,6 +470,10 @@ class App(ttk.Frame):
         bClickStop = True
         self.bClickStop = True
         self.bConnect = False
+        if(self.read_thread is not None):
+            self.stop_thread(self.read_thread)
+        self.button_connect.config(state="normal")
+        self.read_thread = None
         
     def btn_func_clear_text(self):
         self.textdisp.config(state='normal')
@@ -419,8 +481,16 @@ class App(ttk.Frame):
         self.textdisp.update()
         self.textdisp.config(state='disabled')
 
+        self.ax.clear()
+        self.x = []
+        self.currentx = 0
+        for i in range(self.line_length):
+            self.x.append(i)
+        self.dict_realtime_line = {}
+        self.canvas.draw()
+
     def btn_func_subscription_connect(self):
-        global bClickStop
+        global bClickStop, ani
         if(False == self.bConnect):
             print("h:" + self.combobox.get())
             print("t:" + self.str_var_entry_t.get())
@@ -435,12 +505,41 @@ class App(ttk.Frame):
             strCmdPopen = '"' + os.path.abspath(self.mosquitto_sub_path) + '"' + ' -h ' + self.combobox.get() + ' -t ' + self.str_var_entry_t.get() + ' -i ' + self.str_var_entry_i.get() + ' --cafile ' + os.path.abspath(self.str_var_entry_ca.get()) + ' --key ' + os.path.abspath(self.str_var_entry_key.get()) + ' --cert ' + os.path.abspath(self.str_var_entry_cert.get())
             print(strCmd)
             
-            read_thread = threading.Thread(target=self._connect_and_get_message_inner_func, name="T1", args=(strCmdPopen, ))
-            read_thread.start()
+
+            
+
+
+            
+
+            self.read_thread = threading.Thread(target=self._connect_and_get_message_inner_func, name="T1", args=(strCmdPopen, ))
+            self.read_thread.setDaemon(True)
+            self.read_thread.start()
+            
             self.bConnect = True
             bClickStop = False
             self.bClickStop = False
+            # ani = animation.FuncAnimation(self.fig, self.animate, np.arange(1, 200), interval=25, blit=False)
+    
+    def animate(self,i):
+        self.line.set_ydata(1*np.sin(self.x+1*i))  # update the data
+        return self.line,
 
+    def _async_raise(self, tid, exctype):
+        """raises the exception, performs cleanup if needed"""
+        tid = ctypes.c_long(tid)
+        if not inspect.isclass(exctype):
+            exctype = type(exctype)
+        res = ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, ctypes.py_object(exctype))
+        if res == 0:
+            raise ValueError("invalid thread id")
+        elif res != 1:
+            # """if it returns a number greater than one, you're in trouble,
+            # and you should call it again with exc=NULL to revert the effect"""
+            ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, None)
+            raise SystemError("PyThreadState_SetAsyncExc failed")
+
+    def stop_thread(self, thread):
+        self._async_raise(thread.ident, SystemExit)
 
     def _connect_and_get_message(self, cmd):
         p_connect = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -462,9 +561,80 @@ class App(ttk.Frame):
             sys.stdout.flush()
             sys.stderr.flush()
 
+    def _update_figure(self, msg):
+        fTemp = None
+        fHumidity = None
+        strID = "unknown_id"
+        if('"temperature":' in msg):
+            fTemp = msg[msg.find('"temperature":') + len('"temperature":'):]
+            fTemp = fTemp[: fTemp.find(',')]
+            fTemp = float(fTemp)
+        if('"humidity"' in msg):
+            fHumidity = msg[msg.find('"humidity":') + len('"humidity":'):]
+            fHumidity = fHumidity[: fHumidity.find(',')]
+            fHumidity = float(fHumidity)
+        if('"ID": ' in msg):
+            strID = msg[msg.find('"ID": ') + len('"ID": '): msg.find(', "temperature":')]
+        
+        ################################################################
+        # self.dict_realtime_line: [[[temp_x], [temp_y]],[[humidity_x],[fHumidity_y]]]
+        ################################################################
+        if((None != fTemp) or (None != fHumidity)):
+            self.currentx = self.currentx + 1
+            if(re.match('^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$', self.str_var_entry_th.get())):
+                self.list_threshold_line[0].append(self.currentx)
+                self.list_threshold_line[1].append(float(self.str_var_entry_th.get()))
+        if(strID not in self.dict_realtime_line.keys()):
+            self.dict_realtime_line[strID] = [[[],[]],[[],[]]] # [[[temp_x], [temp_y]],[[humidity_x],[fHumidity_y]]]
+            
+        for key in self.dict_realtime_line.keys():
+            if(key == strID):
+                self.dict_realtime_line[key][0][0].append(self.currentx)
+                self.dict_realtime_line[key][0][1].append(fTemp)
+                if(self.line_length < len(self.dict_realtime_line[key][0][0])):
+                    self.dict_realtime_line[key][0][0].pop(0)
+                    self.dict_realtime_line[key][0][1].pop(0)
+            else:
+                self.dict_realtime_line[key][0][0].append(self.currentx)
+                self.dict_realtime_line[key][0][1].append(self.dict_realtime_line[key][0][1][-1])
+                if(self.line_length < len(self.dict_realtime_line[key][0][0])):
+                    self.dict_realtime_line[key][0][0].pop(0)
+                    self.dict_realtime_line[key][0][1].pop(0)
+        
+        self.ax.clear()
+        minx = 1
+        maxx = 0
+        # self.line_threshold, = self.ax.plot(self.x, [float(self.str_var_entry_th.get())]*self.line_length, 'r--')
+        for key in self.dict_realtime_line.keys():
+            if(0 != len(self.dict_realtime_line[key][0][0])):
+                if(self.dict_realtime_line[key][0][0][0] < minx):
+                    minx = self.dict_realtime_line[key][0][0][0]
+                if(self.dict_realtime_line[key][0][0][-1] > maxx):
+                    maxx = self.dict_realtime_line[key][0][0][-1]
+                self.ax.plot(self.dict_realtime_line[key][0][0], self.dict_realtime_line[key][0][1], label=key)
+        
+        line_threshold_x = np.arange(minx,maxx+1)
+        if(self.line_length < len(self.list_threshold_line[0])):
+            self.list_threshold_line[0].pop(0)
+            self.list_threshold_line[1].pop(0)
+        self.line_threshold, = self.ax.plot(self.list_threshold_line[0], self.list_threshold_line[1], 'r--', label='Threshold')
+
+        self.ax.legend()
+        self.ax.axes.xaxis.set_visible(False)
+        plt.pause(0.1)
+        self.canvas.draw()
+
+    
+
+
+
+
+
     def _connect_and_get_message_inner_func(self, cmd):
 
         p_connect = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        self.button_connect.config(state="disabled")
+        # self.p_connect = p_connect
         self.bConnect = True
         
         self.textdisp.tag_config("tag_1", foreground="red", font=('blod'))
@@ -475,16 +645,17 @@ class App(ttk.Frame):
         while p_connect.poll() is None:
             line = p_connect.stdout.readline().strip()
             if line:
-                result.append(line)
+                # result.append(line)
                 strTemp = bytes.decode(line)
                 print(strTemp)
                 self.textdisp.config(state='normal')
-                if(('Warning: ' not in strTemp) and ('Error' not in strTemp)):
+                # if('Warning: ' not in strTemp and 'Error' not in strTemp):
+                if(('"temperature": ' in strTemp) and (', "humidity"' in strTemp)):
                     strID = ""
                     if('"ID": ' in strTemp):
                         strID = strTemp[strTemp.find('"ID": ') + len('"ID": '):strTemp.find(', "temperature"')]
                     else:
-                        strID = ""
+                        strID = "unknown_id"
                     fTemp = float(strTemp[strTemp.find('"temperature": ') + len('"temperature": '):strTemp.find(', "humidity"')])
                     fHumi = float(strTemp[strTemp.find('"humidity": ') + len('"humidity": '):strTemp.find('}')])
                     if(re.match('^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$', self.str_var_entry_th.get())):
@@ -510,9 +681,6 @@ class App(ttk.Frame):
                                         if(', ' == strWarning[-2:]):
                                             strWarning = strWarning[:-2]
                                         strWarning = 'Warning: ' + strWarning
-                                        # self.textdisp.insert('end', strWarning+'\n', "tag_2")
-                                        # strcmd = '"' + os.path.abspath(self.mosquitto_pub_path) + '"' + ' -h ' + self.combobox_pub.get() + ' -t ' + self.str_var_entry_t_pub.get() + ' -i ' + self.str_var_entry_i_pub.get() + ' --cafile ' + os.path.abspath(self.str_var_entry_ca_pub.get()) + ' --key ' + os.path.abspath(self.str_var_entry_key_pub.get()) + ' --cert ' + os.path.abspath(self.str_var_entry_cert_pub.get()) + ' -m "' + strWarning + '"'
-                                        # self._pub_warnings(strcmd)
                                 else:
                                     dictStatus[strID] = 1
                                     for key in dictStatus.keys():
@@ -526,19 +694,23 @@ class App(ttk.Frame):
                             else:
                                 if(1 != nStatus):
                                     strWarning = "Warning: DANGER!"
-                                    # self.textdisp.insert('end', strWarning+'\n', "tag_2")
-                                    # self._pub_warnings(strcmd)
                             if("" != strWarning):
                                 strcmd = '"' + os.path.abspath(self.mosquitto_pub_path) + '"' + ' -h ' + self.combobox_pub.get() + ' -t ' + self.str_var_entry_t_pub.get() + ' -i ' + self.str_var_entry_i_pub.get() + ' --cafile ' + os.path.abspath(self.str_var_entry_ca_pub.get()) + ' --key ' + os.path.abspath(self.str_var_entry_key_pub.get()) + ' --cert ' + os.path.abspath(self.str_var_entry_cert_pub.get()) + ' -m "' + strWarning + '"'
                                 self._pub_warnings(strcmd)
+                        self._update_figure(strTemp)
                     else:
                         self.textdisp.insert('end', strTemp+'\n')
-                else:
+                elif(('Warning: ' in strTemp) or ('Error' in strTemp)):
                     self.textdisp.insert('end', strTemp+'\n', "tag_2")
+                else:
+                    self.textdisp.insert('end', strTemp+'\n')
                 
                 self.textdisp.config(state='disabled')
                 self.textdisp.update()
                 self.textdisp.see('end')
+
+                
+
                 if(True == self.bClickStop):
                     break
             sys.stdout.flush()
@@ -556,34 +728,14 @@ class App(ttk.Frame):
         print(self.str_var_entry_i.get())
         
 
-def _create_interface():
-    root = tk.Tk()
-    root.title("")
-
-
-    # sv_ttk.set_theme("dark")
-    sv_ttk.set_theme("light")
-
-    c_Thread_process = Thread_process()
-    app = App(root, c_Thread_process)
-    app.pack(fill="both", expand=True)
-
-    # Set a minsize for the window, and place it in the middle
-    root.update()
-    root.minsize(root.winfo_width(), root.winfo_height())
-    x_cordinate = int((root.winfo_screenwidth() / 2) - (root.winfo_width() / 2))
-    y_cordinate = int((root.winfo_screenheight() / 2) - (root.winfo_height() / 2))
-    root.geometry("+{}+{}".format(x_cordinate, y_cordinate-20))
-
-    root.mainloop()
-
 if __name__ == "__main__":
     root = tk.Tk()
+    
     root.title("")
     # sv_ttk.set_theme("dark")
     sv_ttk.set_theme("light")
-    c_Thread_process = Thread_process()
-    app = App(root, c_Thread_process)
+    app = App(root)
+    root.protocol('WM_DELETE_WINDOW', app.close_window)
     app.pack(fill="both", expand=True)
     # Set a minsize for the window, and place it in the middle
     root.update()
@@ -591,4 +743,6 @@ if __name__ == "__main__":
     x_cordinate = int((root.winfo_screenwidth() / 2) - (root.winfo_width() / 2))
     y_cordinate = int((root.winfo_screenheight() / 2) - (root.winfo_height() / 2))
     root.geometry("+{}+{}".format(x_cordinate, y_cordinate-20))
+
+    # ani = animation.FuncAnimation(app.fig, app.animate, np.arange(1, 200), interval=25, blit=False)
     root.mainloop()
